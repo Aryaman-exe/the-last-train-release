@@ -1,0 +1,2051 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>The Last Train — Trial 01</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+    :root { --ink:#f7f7f2; --night:#020204; --ash:#a5a5ac; --red:#b51f32; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; overflow:hidden; background:var(--night); color:var(--ink); font-family:'Press Start 2P', monospace; image-rendering:pixelated; }
+    button,input { font:inherit; }
+    .screen { min-height:100vh; position:relative; display:grid; place-items:center; overflow:hidden; }
+    .scene { position:absolute; inset:0; pointer-events:none; background:#020204; animation: train-vibration 2.7s steps(2) infinite; }
+    .backdrop { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; object-position:center; image-rendering:pixelated; image-rendering:crisp-edges; animation: bg-breathing 20s ease-in-out infinite; transform-origin: center center; }
+    .foreground { position:absolute; inset:0; z-index:1; pointer-events:none; overflow:hidden; }
+    .pixel { position:absolute; width:5px; height:5px; background:#f7f7f2; opacity:.28; animation:pixel-drift 5s steps(2) infinite alternate; }
+    .pixel:nth-child(3){left:8%;top:44%;animation-delay:-1s}.pixel:nth-child(4){left:17%;top:73%;animation-delay:-3s}.pixel:nth-child(5){left:76%;top:16%;animation-delay:-2s}.pixel:nth-child(6){left:88%;top:56%;animation-delay:-4s}
+    .pixel-field { position:absolute; left:5%; right:5%; top:8%; height:45%; overflow:hidden; }
+    .pixel-field .pixel { left:var(--x); top:var(--y); width:var(--size); height:var(--size); background:var(--color); opacity:0; animation:particle var(--duration) steps(2) var(--delay) infinite; }
+    .glitch-band { position:absolute; left:-15%; right:-15%; height:3px; background:repeating-linear-gradient(90deg,transparent 0 24px,#f7f7f2 24px 43px,transparent 43px 67px); opacity:.17; animation:glitch-sweep 2.8s steps(5) infinite; }
+    .glitch-band.one { top:31%; animation-delay:-.6s; }.glitch-band.two { top:53%; opacity:.10; animation-duration:4.3s; animation-direction:reverse; }
+    .title-specks { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:0; }
+    .title-specks .speck { position:absolute; background:#f7f7f2; image-rendering:pixelated; image-rendering:crisp-edges; opacity:0; will-change:opacity,transform; }
+    .title-specks .speck-still { opacity:var(--opa,.1); animation:speck-still var(--dur,13s) steps(1) var(--delay,0s) infinite; }
+    .title-specks .speck-flicker { animation:speck-flicker var(--dur,5.5s) steps(1) var(--delay,0s) infinite; }
+    .title-specks .speck-drift { animation:speck-drift var(--dur,8s) steps(1) var(--delay,0s) infinite; }
+    .title-active .backdrop { animation: atmosphere-drift var(--drift-dur,41s) steps(1) var(--drift-delay,0s) infinite, bg-breathing 20s ease-in-out infinite; }
+    .title-active .scene { animation: scene-breathe var(--breathe-dur,53s) steps(4) infinite, train-vibration 2.7s steps(2) infinite; }
+    .title-active .scene:before { content:''; position:absolute; inset:-1px; pointer-events:none; z-index:1; opacity:.035; background:repeating-linear-gradient(0deg,transparent 0 3px,#f7f7f2 3px 4px,transparent 4px 11px); animation:scan-drift 19s steps(3) infinite; mix-blend-mode:screen; }
+    .screen:not(.title-active) .foreground,
+    .screen:not(.title-active) .title-specks { visibility:hidden; }
+    .screen:not(.title-active) .foreground *,
+    .screen:not(.title-active) .title-specks *,
+    .screen:not(.title-active) .title-specks { animation:none !important; }
+    .moon { position:absolute; width:52px; height:52px; border:3px solid var(--ink); border-radius:50%; left:14%; top:13%; opacity:.16; box-shadow:0 0 0 5px #f7f7f20b; animation:moon 15s ease-in-out infinite; }
+    .cloud { position:absolute; top:18%; left:-30%; width:170px; height:7px; background:#f7f7f2; box-shadow:29px -6px #f7f7f2,66px 2px #f7f7f2,119px -5px #f7f7f2; opacity:.055; animation:cloud 34s linear infinite; }
+    .panel { position:relative; z-index:2; width:min(92vw,610px); padding:28px 28px 31px; text-align:center; background:#090b11e6; border:4px solid var(--ink); box-shadow:9px 9px 0 #252832; }
+    #title-card { animation:dialogue-breathe 5.5s ease-in-out infinite; }
+    .eyebrow { display:block; font-size:9px; line-height:1.8; color:var(--ash); margin-bottom:25px; }
+    h1 { font-size:clamp(23px,5vw,44px); line-height:1.55; margin:0 0 28px; letter-spacing:2px; text-shadow:4px 4px #252832; }
+    .rule { height:4px; width:72%; margin:0 auto 25px; background:var(--ink); }
+    .menu { display:grid; gap:15px; justify-items:center; }
+    .pixel-button { cursor:pointer; color:var(--ink); background:transparent; border:0; padding:11px 18px; font-size:13px; line-height:1.4; text-align:left; width:100%; }
+    .pixel-button:hover,.pixel-button:focus-visible,.pixel-button.active { outline:0; color:#080a0e; background:var(--ink); box-shadow:5px 5px 0 var(--red); }
+    .pixel-button:before { content:'> '; visibility:hidden; }
+    .pixel-button:hover:before,.pixel-button:focus-visible:before,.pixel-button.active:before { visibility:visible; }
+    .hint { color:#858a94; font-size:8px; line-height:1.8; margin:25px 0 0; }
+    .hidden { display:none !important; }
+    .identity-panel { width:min(92vw,720px); display:grid; grid-template-columns:180px 1fr; gap:28px; text-align:left; align-items:center; }
+    .avatar-box { width:170px; height:170px; border:4px solid var(--ink); background:#d9d9d0; position:relative; overflow:hidden; }
+    .avatar-box:after { content:'ID PHOTO'; position:absolute; bottom:5px; left:5px; background:#080a0e; color:var(--ink); padding:5px; font-size:7px; }
+    #avatar { width:100%; height:100%; object-fit:cover; image-rendering:pixelated; }
+    .identity-panel h2 { font-size:17px; line-height:1.6; margin:0 0 25px; }
+    label { font-size:9px; line-height:2; color:var(--ash); }
+    input { display:block; width:100%; margin:8px 0 18px; border:3px solid var(--ink); border-radius:0; padding:15px 12px; color:var(--ink); background:#0b0e15; font-size:13px; outline:none; }
+    input:focus { box-shadow:5px 5px 0 var(--red); }
+    .passenger-record { display:grid; gap:9px; margin:0 0 20px; padding:17px 0 0; border-top:2px solid #f7f7f244; }
+    .passenger-record div { display:grid; grid-template-columns:145px 1fr; gap:9px; font-size:9px; line-height:1.5; }
+    .passenger-record dt { color:var(--ash); }.passenger-record dd { margin:0; color:var(--ink); }
+    .confirm { border:3px solid var(--ink); padding:12px; background:var(--ink); color:#080a0e; font-size:10px; cursor:pointer; width:100%; }
+    .confirm:hover,.confirm:focus-visible { background:var(--red); border-color:var(--red); outline:0; color:var(--ink); }
+    #boarding-pass { position:relative; z-index:2; width:min(92vw,720px); display:grid; grid-template-columns:180px 1fr; gap:28px; align-items:center; padding:28px; text-align:left; border:4px solid var(--ink); background:#080a0e; box-shadow:9px 9px 0 #252832; }
+    #boarding-pass h2 { font-size:17px; line-height:1.6; margin:0 0 21px; }
+    .boarding-actions { display:flex; gap:14px; align-items:center; }
+    
+    /* Persistent Story Clock */
+    .persistent-clock {
+      position: fixed;
+      bottom: 16px;
+      right: 20px;
+      font-size: 10px;
+      letter-spacing: 1px;
+      color: var(--ink);
+      opacity: 0.55;
+      z-index: 10;
+      pointer-events: none;
+      user-select: none;
+      font-family: 'Press Start 2P', monospace;
+      text-shadow: 1px 1px 0px #000;
+      animation: clock-flicker 9s infinite;
+    }
+    .persistent-clock.glitching {
+      animation: clock-transition-glitch 0.4s steps(2) infinite !important;
+    }
+
+    /* Ambient Keyframes */
+    @keyframes train-vibration {
+      0%, 100% { transform: translate(0, 0); }
+      20% { transform: translate(0, 1px); }
+      40% { transform: translate(0, 0); }
+      60% { transform: translate(0, -1px); }
+      80% { transform: translate(1px, 0); }
+    }
+
+    @keyframes bg-breathing {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.005); }
+    }
+
+    @keyframes clock-flicker {
+      0%, 88%, 93%, 100% { opacity: 0.55; transform: translate(0,0); }
+      89% { opacity: 0.3; transform: translate(-1px, 0); }
+      91% { opacity: 0.65; transform: translate(0, 1px); }
+      92% { opacity: 0.2; }
+    }
+
+    @keyframes clock-transition-glitch {
+      0% { opacity: 0.9; transform: translate(2px, -1px); filter: invert(1); }
+      50% { opacity: 0.1; transform: translate(-2px, 1px); filter: none; }
+      100% { opacity: 0.8; transform: translate(0, 0); }
+    }
+
+    .scene.micro-glitch {
+      transform: translateX(-1px) !important;
+      filter: brightness(1.08) contrast(1.05);
+    }
+    
+    /* Post-Sync Awakening Layer */
+    #awakening-screen { position:absolute; inset:0; z-index:5; overflow:hidden; background:#000; }
+
+    /* PASSENGER SELECTION BACKGROUND LAYER (5.png) */
+    .passenger-selection-bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 5;
+      transition: opacity 800ms ease;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .passenger-selection-bg.visible {
+      opacity: 1;
+    }
+    .passenger-selection-bg img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    /* Deltarune-style Character Sprite */
+    .awakening-sprite {
+      position: absolute;
+      left: 50%;
+      top: 40%;
+      transform: translate(-50%, -50%);
+      max-height: 48vh;
+      width: auto;
+      object-fit: contain;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      -ms-interpolation-mode: nearest-neighbor;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 1.5s ease-in-out;
+      z-index: 6;
+    }
+    .awakening-sprite.visible {
+      opacity: 1;
+    }
+    
+    /* Cinematic Large Time Reveal */
+    .time-reveal {
+      position: absolute;
+      left: 50%;
+      top: 35vh;
+      transform: translate(-50%, -50%);
+      font-size: clamp(48px, 10vw, 88px);
+      letter-spacing: 6px;
+      color: var(--ink);
+      text-shadow: 6px 6px 0px #252832;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 1.5s ease-in-out;
+      z-index: 7;
+    }
+    .time-reveal.visible {
+      opacity: 1;
+    }
+
+    /* Dialogue Box */
+    .dialogue-wrapper { position:absolute; z-index:8; left:50%; bottom:4vh; width:min(94vw, 860px); transform:translateX(-50%); opacity:0; transition:opacity 0.4s ease; pointer-events:auto; }
+    .dialogue-wrapper.show { opacity:1; }
+    
+    .dialogue-box { display:grid; grid-template-columns:160px 1fr; gap:24px; padding:30px 34px; border:4px solid var(--ink); background:#050507f4; box-shadow:10px 10px 0 #000; align-items:start; min-height:230px; }
+    .dialogue-box.narration-only { grid-template-columns:1fr; }
+    
+    .passenger-portrait { width:150px; height:150px; border:4px solid var(--ink); background:#0b0e15; object-fit:cover; image-rendering:pixelated; transition:opacity 0.5s ease; }
+    .dialogue-content { display:flex; flex-direction:column; justify-flex:flex-start; min-height:160px; }
+    .speaker-name { font-size:12px; color:var(--red); margin-bottom:14px; letter-spacing:1px; text-transform:uppercase; }
+    .dialogue-text { font-size:12px; line-height:1.9; color:var(--ink); white-space:pre-line; margin-bottom:15px; }
+    
+    /* Choice UI */
+    .choices-container { display:flex; flex-direction:column; gap:10px; margin-top:12px; border-top:2px dashed #f7f7f233; padding-top:14px; }
+    .choice-btn { background:transparent; color:var(--ink); border:2px solid transparent; font-size:11px; line-height:1.6; padding:8px 10px; text-align:left; cursor:pointer; }
+    .choice-btn:hover, .choice-btn:focus-visible, .choice-btn.active { background:#f7f7f215; border-color:var(--ink); color:#fff; outline:none; }
+    .choice-btn:before { content:'> '; color:var(--red); }
+    
+    .continue-prompt { font-size:8px; color:var(--ash); text-align:right; margin-top:auto; animation:flicker 2s infinite; cursor:pointer; padding-top:10px; }
+
+    .ending-faces { position:absolute; inset:0; z-index:9; display:grid; grid-template-columns:repeat(5,1fr); gap:10px; padding:18vh 6vw; background:#000; opacity:0; transition:opacity 1.2s ease-in-out; pointer-events:none; align-items:center; }
+    .ending-faces.show { opacity:1; }
+    .ending-faces img { width:100%; aspect-ratio:1; object-fit:cover; image-rendering:pixelated; border:3px solid var(--ink); transition:filter 0.15s steps(2); }
+    .ending-faces img.glitching { filter:invert(1) contrast(2.5) hue-rotate(90deg); }
+
+    /* Screen Flash/Glitch for Failures */
+    .glitch-flash { animation: screen-glitch 0.3s steps(2) 2; }
+    @keyframes screen-glitch {
+      0% { filter: invert(1) hue-rotate(90deg); transform: translate(4px, -4px); }
+      50% { filter: none; transform: translate(-4px, 4px); }
+      100% { filter: invert(0); transform: translate(0, 0); }
+    }
+
+    /* NORTHLINE TERMINAL STYLES */
+    #northline-screen {
+      position: absolute;
+      inset: 0;
+      z-index: 20;
+      background: #020402;
+      color: #33ff33;
+      font-family: 'Press Start 2P', monospace;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: inset 0 0 80px rgba(0,255,0,0.15);
+      overflow: hidden;
+    }
+    #northline-screen:before {
+      content: " ";
+      display: block;
+      position: absolute;
+      top: 0; left: 0; bottom: 0; right: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+      z-index: 2;
+      background-size: 100% 3px, 6px 100%;
+      pointer-events: none;
+    }
+    .nl-header {
+      border-bottom: 2px dashed #33ff33;
+      padding-bottom: 12px;
+      margin-bottom: 18px;
+    }
+    .nl-title {
+      font-size: 18px;
+      margin-bottom: 8px;
+      text-shadow: 0 0 6px rgba(51, 255, 51, 0.6);
+    }
+    .nl-sub {
+      font-size: 9px;
+      color: #11aa11;
+    }
+    .nl-body {
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 12px;
+      z-index: 3;
+    }
+    .nl-footer {
+      border-top: 2px dashed #33ff33;
+      padding-top: 10px;
+      margin-top: 12px;
+      font-size: 8px;
+      display: flex;
+      justify-content: space-between;
+      color: #11aa11;
+      z-index: 3;
+    }
+    .nl-menu-item {
+      padding: 10px 12px;
+      margin: 6px 0;
+      background: transparent;
+      border: 1px solid transparent;
+      color: #33ff33;
+      cursor: pointer;
+      font-size: 11px;
+      text-align: left;
+      width: 100%;
+      display: block;
+    }
+    .nl-menu-item:hover, .nl-menu-item.active {
+      background: #33ff33;
+      color: #020402;
+      outline: none;
+    }
+    .nl-menu-item:before {
+      content: '> ';
+    }
+    .nl-input {
+      background: #020402;
+      border: 2px solid #33ff33;
+      color: #33ff33;
+      padding: 12px;
+      font-family: inherit;
+      font-size: 11px;
+      width: 100%;
+      margin: 12px 0;
+      outline: none;
+    }
+    .nl-input:focus {
+      box-shadow: 0 0 10px rgba(51, 255, 51, 0.5);
+    }
+    .nl-card {
+      border: 1px solid #33ff33;
+      padding: 14px;
+      margin-bottom: 14px;
+      background: rgba(0, 20, 0, 0.4);
+      display: flex;
+      gap: 16px;
+    }
+    .nl-card-img {
+      width: 90px;
+      height: 125px;
+      object-fit: cover;
+      border: 1px solid #33ff33;
+      image-rendering: pixelated;
+      background: #000;
+    }
+    .nl-card-info {
+      flex: 1;
+      font-size: 9px;
+      line-height: 1.6;
+    }
+    .nl-card-title {
+      font-size: 12px;
+      margin-bottom: 8px;
+      color: #33ff33;
+    }
+    .nl-ep-list {
+      margin-top: 12px;
+      max-height: 180px;
+      overflow-y: auto;
+      border-top: 1px dashed #33ff33;
+      padding-top: 8px;
+      font-size: 8px;
+    }
+    .nl-ep-item {
+      padding: 4px 0;
+      border-bottom: 1px dotted #11aa11;
+    }
+    a.nl-link {
+      color: #33ff33;
+      text-decoration: underline;
+    }
+
+    @keyframes cloud { to { transform:translateX(150vw); } } @keyframes moon { 50%{transform:translateY(5px);opacity:.74} } @keyframes particle { 0%{transform:translate(0,0);opacity:0} 18%{opacity:calc(var(--alpha) * .3)} 48%{opacity:var(--alpha)} 100%{transform:translate(var(--dx),var(--dy));opacity:0} } @keyframes glitch-sweep { 0%{transform:translateX(-9%);opacity:.02} 35%{opacity:.2} 70%{opacity:.07} 100%{transform:translateX(9%);opacity:.02} } @keyframes dialogue-breathe { 0%,100%{transform:translateY(0);box-shadow:9px 9px 0 #252832} 50%{transform:translateY(-3px);box-shadow:11px 13px 0 #252832,0 0 19px #f7f7f20b} } @keyframes flicker { 0%,92%,95%,100%{opacity:1}93%,94%{opacity:.2} }
+    @keyframes atmosphere-drift { 0%,18%,37%,58%,79%,100%{transform:translate(0,0)} 7%{transform:translate(1px,0)} 14%{transform:translate(0,1px)} 24%{transform:translate(-1px,1px)} 31%{transform:translate(-1px,0)} 44%{transform:translate(0,-1px)} 51%{transform:translate(1px,-1px)} 66%{transform:translate(1px,1px)} 71%{transform:translate(-1px,-1px)} 88%{transform:translate(0,1px)} 93%{transform:translate(1px,0)} }
+    @keyframes scene-breathe { 0%,100%{filter:brightness(1)} 21%{filter:brightness(1.012)} 47%{filter:brightness(.992)} 73%{filter:brightness(1.008)} }
+    @keyframes scan-drift { 0%,100%{transform:translateY(0);opacity:.02} 33%{transform:translateY(1px);opacity:.05} 67%{transform:translateY(-1px);opacity:.03} }
+    @keyframes speck-still { 0%,84%,100%{opacity:var(--opa,.1)} 85%{opacity:0} 86%{opacity:calc(var(--opa,.1) * 1.35)} 87%{opacity:var(--opa,.1)} 91%{opacity:calc(var(--opa,.1) * .55)} 92%{opacity:var(--opa,.1)} }
+    @keyframes speck-flicker { 0%,62%,100%{opacity:0;transform:translate(0,0)} 63%{opacity:var(--opa,.22)} 64%{opacity:0} 78%{opacity:var(--opa,.16)} 79%{opacity:0} 88%{opacity:var(--opa,.12);transform:translate(var(--dx,1px),var(--dy,0))} 89%{opacity:0} }
+    @keyframes speck-drift { 0%,35%,100%{opacity:0;transform:translate(0,0)} 36%{opacity:var(--opa,.18)} 52%{opacity:var(--opa,.14);transform:translate(var(--dx,1px),var(--dy,1px))} 53%{opacity:0} 71%{opacity:var(--opa,.1);transform:translate(calc(var(--dx,1px) * -1),var(--dy,0))} 72%{opacity:0} }
+    @media(max-width:650px){ .identity-panel,#boarding-pass{grid-template-columns:1fr;text-align:center}.avatar-box{margin:auto}.panel{padding:24px 17px}.dialogue-box{grid-template-columns:1fr; padding:20px; min-height:260px;}.passenger-portrait{margin:0 auto 10px; width:110px; height:110px;} }
+    @media(prefers-reduced-motion:reduce){ *,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important} }
+  </style>
+</head>
+<body>
+  <audio id="ambient-track" loop preload="auto"><source src="Start.mp3" type="audio/mpeg"></audio>
+  <main class="screen title-active" id="main-screen">
+    <div class="scene" id="scene-layer" aria-hidden="true"><img class="backdrop" src="last-train-void-pixel-art.png" alt=""><div class="moon"></div><div class="cloud"></div></div>
+    <div class="foreground" aria-hidden="true"><div class="title-specks" id="title-specks"></div><div class="glitch-band one"></div><div class="glitch-band two"></div><div class="pixel-field" id="pixel-field"></div></div>
+    
+    <section class="panel" id="title-card">
+      <span class="eyebrow">NORTHLINE RAILWAY // LAST SERVICE</span>
+      <h1>THE LAST<br>TRAIN</h1><div class="rule"></div>
+      <nav class="menu">
+        <button class="pixel-button" id="board">BOARD</button>
+        <button class="pixel-button" id="northline-btn">NORTHLINE INTERFACE</button>
+        <button class="pixel-button" id="exit">EXIT</button>
+      </nav>
+      <p class="hint">A train waits for every passenger.<br>Not every passenger arrives.</p>
+    </section>
+    
+    <section class="panel identity-panel hidden" id="identity">
+      <div class="avatar-box"><img id="avatar" src="https://robohash.org/passenger?set=set4&size=170x170" alt="Passenger portrait"></div>
+      <div><span class="eyebrow">NORTHLINE RAILWAY // RECORD 01</span><h2>PASSENGER<br>IDENTIFICATION</h2>
+      <label for="name">NAME:</label><input id="name" maxlength="20" autocomplete="off" placeholder="PASSENGER">
+      <button class="confirm" id="confirm">CONFIRM IDENTITY</button><p class="hint">Your portrait changes with your name.</p></div>
+    </section>
+    
+    <section id="boarding-pass" class="hidden">
+      <div class="avatar-box"><img id="final-avatar" src="https://robohash.org/passenger?set=set4&size=170x170" alt="Passenger portrait"></div>
+      <div><span class="eyebrow">NORTHLINE RAILWAY // VALID</span><h2>PASSENGER<br>IDENTIFICATION</h2><dl class="passenger-record"><div><dt>NAME:</dt><dd id="passenger-name">PASSENGER</dd></div><div><dt>STATUS:</dt><dd>CONFIRMED</dd></div><div><dt>LOCATION:</dt><dd class="unknown">UNKNOWN</dd></div><div><dt>DESTINATION:</dt><dd class="unknown">UNKNOWN</dd></div><div><dt>LAST MEMORY:</dt><dd class="corrupted">[CORRUPTED]</dd></div><div><dt>TICKET:</dt><dd>VALID</dd></div></dl><div class="boarding-actions"><button class="pixel-button" id="restart">CHANGE NAME</button><button class="confirm" id="sync">ENTER CAR 07</button></div></div>
+    </section>
+
+    <!-- NORTHLINE TERMINAL SCREEN -->
+    <section id="northline-screen" class="hidden">
+      <div class="nl-header">
+        <div class="nl-title">NORTHLINE INTERFACE</div>
+        <div class="nl-sub">SYSTEM ACCESS: GRANTED // TERMINAL v4.09</div>
+      </div>
+      <div class="nl-body" id="nl-body">
+        <!-- Dynamic terminal content renders here -->
+      </div>
+      <div class="nl-footer">
+        <div>[ESC] PREVIOUS / RETURN</div>
+        <div id="nl-attr" class="hidden">DATA PROVIDED BY <a href="https://www.tvmaze.com" target="_blank" class="nl-link">TVMAZE</a></div>
+        <div>NORTHLINE OS</div>
+      </div>
+    </section>
+
+    <!-- Post-Sync Awakening Layer -->
+    <section id="awakening-screen" class="hidden">
+      <!-- PASSENGER SELECTION BACKGROUND -->
+      <div id="passenger-selection-background" class="passenger-selection-bg">
+        <img src="5.png" alt="Passenger Selection Atmosphere">
+      </div>
+
+      <img id="awakening-sprite" class="awakening-sprite" src="Codex Image Sep 12, 2026, 01_39_34 PM.png" alt="Awakening Character Sprite">
+      <div id="time-reveal" class="time-reveal">11:47 PM</div>
+      <div id="persistent-clock" class="persistent-clock hidden">11:47 PM</div>
+      <div class="dialogue-wrapper" id="dialogue-wrapper">
+        <div class="dialogue-box narration-only" id="dialogue-box">
+          <img id="speaker-avatar" class="passenger-portrait hidden" src="" alt="Passenger avatar">
+          <div class="dialogue-content">
+            <div id="speaker-name" class="speaker-name hidden"></div>
+            <div id="dialogue-text" class="dialogue-text"></div>
+            <div id="choices-container" class="choices-container hidden"></div>
+            <div id="continue-prompt" class="continue-prompt">[ CLICK OR PRESS SPACE ]</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // --- GAME STATE ---
+    const gameState = {
+      playerName: "PASSENGER",
+      storyTime: "11:47 PM",
+      spokenTo: { karube: false, chota: false, mira: false, ann: false, niragi: false },
+      choices: {},
+      trust: { karube: 0, chota: 0, mira: 0, ann: 0, niragi: 0 },
+      suspicion: { karube: 0, chota: 0, mira: 0, ann: 0, niragi: 0 },
+      clues: { karubeAwakeFirst: false, doorsLockedFromInside: false, clockFrozenAt1147: false, niragiCalmness: false },
+      currentStep: "INTRO",
+      trial02: null
+    };
+
+    const TRIAL02_DISAPPEAR_ORDER = ['karube', 'chota', 'mira', 'ann', 'niragi'];
+    const TRIAL02_SEATS = [
+      { seat: '08', key: 'karube' },
+      { seat: '09', key: 'chota' },
+      { seat: '11', key: 'mira' },
+      { seat: '12', key: 'ann' },
+      { seat: '13', key: 'niragi' },
+      { seat: '14', key: 'player' }
+    ];
+    const CINEMATIC_STEPS = ['INTRO', 'TRIAL_INTRO', 'TRIAL_01_ENDING', 'TRIAL_02_INTRO', 'TRIAL_02_CINEMATIC', 'TRIAL_02_WRONG', 'TRIAL_02_SUCCESS', 'TRIAL_02_ENDING'];
+
+    function resetTrial02State() {
+      gameState.trial02 = {
+        inspectedSeats: false,
+        countedPassengers: false,
+        spokenTo: { karube: false, chota: false, mira: false, ann: false, niragi: false },
+        disappeared: [],
+        actionsSinceDisappearance: 0,
+        introComplete: false,
+        finalPhase: false
+      };
+    }
+
+    function getPlayerAvatarUrl() {
+      const finalAvatar = document.querySelector('#final-avatar');
+      if (finalAvatar && finalAvatar.src && finalAvatar.src.indexOf('robohash.org') !== -1) return finalAvatar.src;
+      return `https://robohash.org/${encodeURIComponent(gameState.playerName)}?set=set4&size=170x170&bgset=bg1`;
+    }
+
+    function getVisibleTrial02Npcs() {
+      return TRIAL02_DISAPPEAR_ORDER.filter(k => !gameState.trial02.disappeared.includes(k));
+    }
+
+    function getTrial02TalkCount() {
+      return Object.values(gameState.trial02.spokenTo).filter(Boolean).length;
+    }
+
+    function recordTrial02Action() {
+      if (gameState.trial02.disappeared.length > 0) gameState.trial02.actionsSinceDisappearance++;
+    }
+
+    function shouldTriggerTrial02Disappearance() {
+      const t2 = gameState.trial02;
+      if (!t2.introComplete || t2.disappeared.length >= TRIAL02_DISAPPEAR_ORDER.length) return false;
+      if (t2.disappeared.length === 0) {
+        return t2.inspectedSeats && (t2.countedPassengers || getTrial02TalkCount() >= 2);
+      }
+      return t2.actionsSinceDisappearance >= 2;
+    }
+
+    function getNextTrial02Disappearance() {
+      return TRIAL02_DISAPPEAR_ORDER[gameState.trial02.disappeared.length];
+    }
+
+    function markTrial02Talk(key) {
+      gameState.trial02.spokenTo[key] = true;
+    }
+
+    function trial02FinishInvestigation() {
+      recordTrial02Action();
+      if (shouldTriggerTrial02Disappearance()) runTrial02Disappearance(getNextTrial02Disappearance());
+      else openTrial02Hub();
+    }
+
+    function buildTrial02CountText() {
+      const visible = getVisibleTrial02Npcs();
+      let text = "CURRENT PASSENGERS:\n\n";
+      visible.forEach(k => { text += PASSENGERS[k].name + "\n"; });
+      text += gameState.playerName + "\n\nTOTAL: " + (visible.length + 1);
+      return text;
+    }
+
+    function buildTrial02SeatsText() {
+      let text = "CAR 07\n\n";
+      TRIAL02_SEATS.forEach(s => {
+        if (s.key === 'player') {
+          text += `SEAT ${s.seat} — ${gameState.playerName}\n`;
+        } else if (gameState.trial02.disappeared.includes(s.key)) {
+          text += `SEAT ${s.seat}\nOCCUPANT:\n[NO RECORD]\n\n`;
+        } else {
+          text += `SEAT ${s.seat} — ${PASSENGERS[s.key].name}\n`;
+        }
+      });
+      const allPresent = gameState.trial02.disappeared.length === 0;
+      text += allPresent ? "\nAll six positions are accounted for.\n\nNothing appears wrong." : "\nThe empty seats remain.";
+      return text;
+    }
+
+    const PASSENGERS = {
+      karube: { name: "KARUBE", avatar: "https://robohash.org/karube?set=set4&size=170x170" },
+      chota: { name: "CHŌTA", avatar: "https://robohash.org/chota?set=set4&size=170x170" },
+      mira: { name: "MIRA", avatar: "https://robohash.org/mira?set=set4&size=170x170" },
+      ann: { name: "ANN", avatar: "https://robohash.org/ann?set=set4&size=170x170" },
+      niragi: { name: "NIRAGI", avatar: "https://robohash.org/niragi?set=set4&size=170x170" }
+    };
+
+    const TICKETS_DATA = [
+      { name: "KARUBE", car: "07", seat: "08", time: "11:31 PM" },
+      { name: "CHŌTA", car: "07", seat: "09", time: "11:34 PM" },
+      { name: "MIRA", car: "07", seat: "11", time: "11:39 PM" },
+      { name: "ANN", car: "07", seat: "12", time: "11:42 PM" },
+      { name: "NIRAGI", car: "07", seat: "13", time: "11:52 PM" }
+    ];
+
+    // --- DOM ELEMENTS ---
+    const mainScreen = document.querySelector('#main-screen');
+    const title = document.querySelector('#title-card'), identity = document.querySelector('#identity'), pass = document.querySelector('#boarding-pass');
+    const ambientTrack = document.querySelector('#ambient-track'); ambientTrack.volume = .36;
+    const awakeningScreen = document.querySelector('#awakening-screen');
+    const awakeningSprite = document.querySelector('#awakening-sprite');
+    const timeReveal = document.querySelector('#time-reveal');
+    const persistentClock = document.querySelector('#persistent-clock');
+    const sceneLayer = document.querySelector('#scene-layer');
+    const dialogueWrapper = document.querySelector('#dialogue-wrapper');
+    const dialogueBox = document.querySelector('#dialogue-box');
+    const dialogueText = document.querySelector('#dialogue-text');
+    const speakerName = document.querySelector('#speaker-name');
+    const speakerAvatar = document.querySelector('#speaker-avatar');
+    const choicesContainer = document.querySelector('#choices-container');
+    const continuePrompt = document.querySelector('#continue-prompt');
+
+    // --- PASSENGER SELECTION BACKGROUND CONTROLLER ---
+    function showPassengerSelectionBackground() {
+      const bgLayer = document.getElementById('passenger-selection-background');
+      if (bgLayer) {
+        bgLayer.classList.add('visible');
+      }
+    }
+
+    function hidePassengerSelectionBackground() {
+      const bgLayer = document.getElementById('passenger-selection-background');
+      if (bgLayer) {
+        bgLayer.classList.remove('visible');
+      }
+    }
+
+    function updatePersistentClock(timeStr) {
+      if (timeStr) gameState.storyTime = timeStr;
+      persistentClock.textContent = gameState.storyTime;
+    }
+
+    // --- RARE MICRO BACKGROUND GLITCH LOGIC ---
+    function triggerRareMicroGlitch() {
+      if (Math.random() < 0.3) {
+        sceneLayer.classList.add('micro-glitch');
+        const duration = 50 + Math.floor(Math.random() * 100); // 50ms to 150ms
+        setTimeout(() => {
+          sceneLayer.classList.remove('micro-glitch');
+        }, duration);
+      }
+      const nextInterval = 8000 + Math.floor(Math.random() * 10000); // 8s to 18s
+      setTimeout(triggerRareMicroGlitch, nextInterval);
+    }
+    setTimeout(triggerRareMicroGlitch, 6000);
+
+    const pixelField = document.querySelector('#pixel-field');
+    const titleSpecks = document.querySelector('#title-specks');
+    const pixelPalette = [{ color:'#f7f7f2', alpha:1 }, { color:'#babac0', alpha:.78 }, { color:'#777780', alpha:.58 }, { color:'#f7f7f2', alpha:.35 }];
+    for (let i = 0; i < 34; i++) {
+      const tone = pixelPalette[Math.floor(Math.random() * pixelPalette.length)];
+      const pixel = document.createElement('i');
+      pixel.className = 'pixel';
+      pixel.style.setProperty('--x', `${Math.random() * 100}%`);
+      pixel.style.setProperty('--y', `${Math.random() * 100}%`);
+      pixel.style.setProperty('--size', `${2 + Math.floor(Math.random() * 5)}px`);
+      pixel.style.setProperty('--color', tone.color);
+      pixel.style.setProperty('--alpha', tone.alpha);
+      pixel.style.setProperty('--dx', `${-16 + Math.floor(Math.random() * 33)}px`);
+      pixel.style.setProperty('--dy', `${-12 + Math.floor(Math.random() * 25)}px`);
+      pixel.style.setProperty('--duration', `${1.3 + Math.random() * 3.2}s`);
+      pixel.style.setProperty('--delay', `${-Math.random() * 5}s`);
+      pixelField.appendChild(pixel);
+    }
+    const speckPalette = ['#f7f7f2', '#babac0', '#8d8d95', '#d8d8dc'];
+    const speckKinds = ['speck-still', 'speck-flicker', 'speck-drift'];
+    for (let i = 0; i < 36; i++) {
+      const speck = document.createElement('span');
+      const kind = speckKinds[Math.floor(Math.random() * speckKinds.length)];
+      speck.className = `speck ${kind}`;
+      const size = 1 + Math.floor(Math.random() * 2);
+      speck.style.left = `${4 + Math.random() * 92}%`;
+      speck.style.top = `${6 + Math.random() * 84}%`;
+      speck.style.width = `${size}px`;
+      speck.style.height = `${size}px`;
+      speck.style.background = speckPalette[Math.floor(Math.random() * speckPalette.length)];
+      speck.style.setProperty('--opa', `${.08 + Math.random() * .18}`);
+      speck.style.setProperty('--dur', `${4 + Math.random() * 11}s`);
+      speck.style.setProperty('--delay', `${-Math.random() * 12}s`);
+      if (kind !== 'speck-still') {
+        speck.style.setProperty('--dx', `${Math.floor(Math.random() * 3) - 1}px`);
+        speck.style.setProperty('--dy', `${Math.floor(Math.random() * 3) - 1}px`);
+      }
+      titleSpecks.appendChild(speck);
+    }
+    document.querySelector('.backdrop').style.setProperty('--drift-dur', `${36 + Math.random() * 14}s`);
+    document.querySelector('.backdrop').style.setProperty('--drift-delay', `${-Math.random() * 20}s`);
+    document.querySelector('.scene').style.setProperty('--breathe-dur', `${48 + Math.random() * 12}s`);
+    function endPreGameAmbience() { mainScreen.classList.remove('title-active'); }
+
+    const nameInput = document.querySelector('#name'), avatar = document.querySelector('#avatar');
+    function safeName(val) { return val.trim().replace(/[^a-zA-Z0-9 _-]/g, '').slice(0,20) || 'PASSENGER'; }
+    function updateAvatar() { const v = safeName(nameInput.value); avatar.src = `https://robohash.org/${encodeURIComponent(v)}?set=set4&size=170x170&bgset=bg1`; }
+    
+    document.querySelector('#board').addEventListener('click', () => { 
+      ambientTrack.volume = .36; ambientTrack.currentTime = 0; ambientTrack.play().catch(() => {}); 
+      title.classList.add('hidden'); identity.classList.remove('hidden'); nameInput.focus(); 
+    });
+    nameInput.addEventListener('input', updateAvatar);
+    document.querySelector('#confirm').addEventListener('click', () => { 
+      gameState.playerName = safeName(nameInput.value).toUpperCase(); 
+      document.querySelector('#passenger-name').textContent = gameState.playerName; 
+      document.querySelector('#final-avatar').src = avatar.src; 
+      identity.classList.add('hidden'); pass.classList.remove('hidden'); 
+    });
+    nameInput.addEventListener('keydown', e => { if(e.key === 'Enter') document.querySelector('#confirm').click(); });
+    document.querySelector('#restart').addEventListener('click', () => { pass.classList.add('hidden'); identity.classList.remove('hidden'); nameInput.focus(); });
+    document.querySelector('#exit').addEventListener('click', () => { document.querySelector('.hint').textContent = 'The station keeps its doors open.'; });
+
+    function fadeOutTrack() {
+      const initialVolume = ambientTrack.volume;
+      const start = performance.now();
+      const duration = 1500;
+      function fade(now) {
+        const amount = Math.min((now - start) / duration, 1);
+        ambientTrack.volume = initialVolume * (1 - amount);
+        if (amount < 1) requestAnimationFrame(fade);
+        else {
+          ambientTrack.pause();
+          ambientTrack.currentTime = 0;
+          ambientTrack.volume = .36;
+        }
+      }
+      requestAnimationFrame(fade);
+    }
+
+    // --- AUDIO SYNTHESIZER ---
+    let audioCtx = null;
+    function playKeyClickSound() {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(680 + (Math.random() * 140 - 70), audioCtx.currentTime);
+        gain.gain.setValueAtTime(50, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.035);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.035);
+      } catch (e) {}
+    }
+
+    // --- TYPEWRITER ENGINE ---
+    let isTyping = false, typeInterval = null, currentFullText = "", onTypingFinished = null;
+
+    function typeText(text, callback) {
+      clearInterval(typeInterval);
+      isTyping = true;
+      currentFullText = text;
+      dialogueText.textContent = "";
+      continuePrompt.classList.add('hidden');
+      choicesContainer.classList.add('hidden');
+      onTypingFinished = callback;
+
+      let charIndex = 0;
+      typeInterval = setInterval(() => {
+        const char = text[charIndex];
+        dialogueText.textContent += char;
+        
+        if (char && char !== ' ' && char !== '\n' && char !== '.' && char !== ',' && char !== '"' && char !== '[' && char !== ']') {
+          playKeyClickSound();
+        }
+
+        charIndex++;
+        if (charIndex >= text.length) {
+          finishTyping();
+        }
+      }, 60);
+    }
+
+    function finishTyping() {
+      clearInterval(typeInterval);
+      dialogueText.textContent = currentFullText;
+      isTyping = false;
+      if (onTypingFinished) onTypingFinished();
+    }
+
+    // --- UI DISPLAY HELPERS ---
+    let activeChoiceOptions = [];
+
+    function showDialogue(speakerKey, text, onComplete) {
+      activeChoiceOptions = [];
+      dialogueWrapper.classList.add('show');
+      if (speakerKey && PASSENGERS[speakerKey]) {
+        dialogueBox.classList.remove('narration-only');
+        speakerName.classList.remove('hidden');
+        speakerAvatar.classList.remove('hidden');
+        speakerName.textContent = PASSENGERS[speakerKey].name;
+        speakerAvatar.src = PASSENGERS[speakerKey].avatar;
+      } else {
+        dialogueBox.classList.add('narration-only');
+        speakerName.classList.add('hidden');
+        speakerAvatar.classList.add('hidden');
+      }
+
+      typeText(text, () => {
+        continuePrompt.classList.remove('hidden');
+        if (onComplete) onComplete();
+      });
+    }
+
+    function showChoices(speakerKey, promptText, options) {
+      activeChoiceOptions = options;
+      dialogueWrapper.classList.add('show');
+      if (speakerKey && PASSENGERS[speakerKey]) {
+        dialogueBox.classList.remove('narration-only');
+        speakerName.classList.remove('hidden');
+        speakerAvatar.classList.remove('hidden');
+        speakerName.textContent = PASSENGERS[speakerKey].name;
+        speakerAvatar.src = PASSENGERS[speakerKey].avatar;
+      } else {
+        dialogueBox.classList.add('narration-only');
+        speakerName.classList.add('hidden');
+        speakerAvatar.classList.add('hidden');
+      }
+
+      typeText(promptText, () => {
+        choicesContainer.innerHTML = "";
+        choicesContainer.classList.remove('hidden');
+        continuePrompt.classList.add('hidden');
+
+        options.forEach((opt, idx) => {
+          const btn = document.createElement('button');
+          btn.className = 'choice-btn';
+          btn.textContent = opt.label;
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            choicesContainer.classList.add('hidden');
+            activeChoiceOptions = [];
+            opt.action();
+          });
+          choicesContainer.appendChild(btn);
+        });
+      });
+    }
+
+    // ==================================================
+    // NORTHLINE INTERFACE & TVMAZE INTEGRATION MODULE
+    // ==================================================
+    const northlineBtn = document.querySelector('#northline-btn');
+    const northlineScreen = document.querySelector('#northline-screen');
+    const nlBody = document.querySelector('#nl-body');
+    const nlAttr = document.querySelector('#nl-attr');
+
+    let nlHistory = [];
+    const showCache = new Map();
+
+    northlineBtn.addEventListener('click', () => {
+      ambientTrack.volume = .36; ambientTrack.currentTime = 0; ambientTrack.play().catch(() => {});
+      title.classList.add('hidden');
+      northlineScreen.classList.remove('hidden');
+      openNorthlineMain();
+    });
+
+    function nlNavigateTo(renderFunc) {
+      nlHistory.push(renderFunc);
+      renderFunc();
+    }
+
+    function nlGoBack() {
+      if (nlHistory.length > 1) {
+        nlHistory.pop();
+        const prev = nlHistory[nlHistory.length - 1];
+        prev();
+      } else {
+        nlHistory = [];
+        northlineScreen.classList.add('hidden');
+        title.classList.remove('hidden');
+      }
+    }
+
+    function sanitizeHTML(str) {
+      if (!str) return '';
+      return str.replace(/<[^>]*>?/gm, '');
+    }
+
+    function openNorthlineMain() {
+      nlAttr.classList.add('hidden');
+      nlBody.innerHTML = `
+        <div style="margin-bottom: 20px; line-height: 1.8;">
+          NORTHLINE INTERFACE<br>
+          ------------------------------<br>
+          SYSTEM ACCESS: GRANTED
+        </div>
+        <div class="menu" id="nl-menu">
+          <button class="nl-menu-item" data-act="tv">TV DATABASE</button>
+          <button class="nl-menu-item" data-act="passengers">PASSENGER RECORDS</button>
+          <button class="nl-menu-item" data-act="train">TRAIN RECORDS</button>
+          <button class="nl-menu-item" data-act="incidents">INCIDENT REPORTS</button>
+          <button class="nl-menu-item" data-act="logs">INTERNAL LOGS</button>
+          <button class="nl-menu-item" data-act="locked">??? [LOCKED]</button>
+        </div>
+      `;
+
+      const menu = document.getElementById('nl-menu');
+      menu.querySelectorAll('.nl-menu-item').forEach(btn => {
+        btn.addEventListener('click', () => {
+          playKeyClickSound();
+          const act = btn.dataset.act;
+          if (act === 'tv') nlNavigateTo(openTvDatabase);
+          else if (act === 'passengers') nlNavigateTo(openPassengerRecords);
+          else if (act === 'train') nlNavigateTo(openTrainRecords);
+          else if (act === 'incidents') nlNavigateTo(() => showSimpleNLRecord("INCIDENT REPORTS", "[NO ACCESSIBLE RECORDS]"));
+          else if (act === 'logs') nlNavigateTo(() => showSimpleNLRecord("INTERNAL LOGS", "[NO ACCESSIBLE RECORDS]"));
+          else if (act === 'locked') nlNavigateTo(() => showSimpleNLRecord("SECURITY SYSTEM", "ACCESS DENIED\nCLEARANCE LEVEL INSUFFICIENT"));
+        });
+      });
+
+      nlAttachKeyboardNav();
+    }
+
+    function showSimpleNLRecord(titleStr, bodyStr) {
+      nlAttr.classList.add('hidden');
+      nlBody.innerHTML = `
+        <div style="margin-bottom:15px;">NORTHLINE // ${titleStr}</div>
+        <div style="border: 1px solid #33ff33; padding: 20px; white-space: pre-line; line-height: 1.8;">${bodyStr}</div>
+        <button class="nl-menu-item" style="margin-top:20px;" id="nl-back-btn">RETURN</button>
+      `;
+      document.getElementById('nl-back-btn').addEventListener('click', () => { playKeyClickSound(); nlGoBack(); });
+      nlAttachKeyboardNav();
+    }
+
+    // PASSENGER RECORDS
+    function openPassengerRecords() {
+      nlAttr.classList.add('hidden');
+      nlBody.innerHTML = `
+        <div style="margin-bottom:15px;">NORTHLINE // PASSENGER RECORDS</div>
+        <div id="nl-menu">
+          <button class="nl-menu-item" data-p="karube">KARUBE</button>
+          <button class="nl-menu-item" data-p="chota">CHŌTA</button>
+          <button class="nl-menu-item" data-p="mira">MIRA</button>
+          <button class="nl-menu-item" data-p="ann">ANN</button>
+          <button class="nl-menu-item" data-p="niragi">NIRAGI</button>
+          <button class="nl-menu-item" id="nl-back-btn" style="margin-top:15px;">RETURN</button>
+        </div>
+      `;
+
+      const pData = {
+        karube: "PASSENGER RECORD: KARUBE\nSTATUS: ACTIVE / CAR 07\nBOARDING: 11:31 PM\n\nNOTES: Possesses strong physical presence. Displays acute situational awareness. Observed inspecting door mechanisms immediately upon waking.",
+        chota: "PASSENGER RECORD: CHŌTA\nSTATUS: ACTIVE / CAR 07\nBOARDING: 11:34 PM\n\nNOTES: High anxiety metrics. Woke up confused regarding travel history. Holds strong emotional attachment to existing companions.",
+        mira: "PASSENGER RECORD: MIRA\nSTATUS: ACTIVE / CAR 07\nBOARDING: 11:39 PM\n\nNOTES: Highly analytical. Focuses heavily on structural & electronic anomalies within the carriage. Remains collected under high stress.",
+        ann: "PASSENGER RECORD: ANN\nSTATUS: ACTIVE / CAR 07\nBOARDING: 11:42 PM\n\nNOTES: Methodical behavior. Noticed temporal anomaly at 11:47 PM. Exhibits advanced observational skills.",
+        niragi: "PASSENGER RECORD: NIRAGI\nSTATUS: ACTIVE / CAR 07\nBOARDING: 11:52 PM\n\nNOTES: Anomalous ticket boarding time detected. Demonstrates abnormal psychological calm. Anticipates system events."
+      };
+
+      document.querySelectorAll('#nl-menu .nl-menu-item[data-p]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          playKeyClickSound();
+          const pKey = btn.dataset.p;
+          nlNavigateTo(() => showSimpleNLRecord(`PASSENGER // ${pKey.toUpperCase()}`, pData[pKey]));
+        });
+      });
+
+      document.getElementById('nl-back-btn').addEventListener('click', () => { playKeyClickSound(); nlGoBack(); });
+      nlAttachKeyboardNav();
+    }
+
+    // TRAIN RECORDS
+    function openTrainRecords() {
+      nlAttr.classList.add('hidden');
+      const lore = `NORTHLINE RAILWAY // CARRIAGE DATABASE
+
+CAR 01: [RECORD UNAVAILABLE]
+CAR 02: [RECORD UNAVAILABLE]
+CAR 03: [RECORD UNAVAILABLE]
+CAR 04: [RECORD UNAVAILABLE]
+CAR 05: [RECORD UNAVAILABLE]
+CAR 06: [RECORD UNAVAILABLE]
+CAR 07: PASSENGER CARRIAGE - CURRENT LOCATION
+        CAPACITY: 6 SEATS ACCOUNTED
+        TEMPORAL STATUS: FROZEN (11:47 PM)
+CAR 08: [RECORD UNAVAILABLE]`;
+
+      showSimpleNLRecord("TRAIN RECORDS", lore);
+    }
+
+    // TV DATABASE (LIVE TVMAZE INTEGRATION)
+    function openTvDatabase() {
+      nlAttr.classList.remove('hidden');
+      nlBody.innerHTML = `
+        <div style="margin-bottom:12px;">NORTHLINE TV DATABASE</div>
+        <div style="font-size:9px; margin-bottom:10px;">SEARCH TELEVISION DATABASE:</div>
+        <form id="nl-search-form" style="margin-bottom:15px;">
+          <input type="text" id="nl-search-input" class="nl-input" autocomplete="off" placeholder="TYPE TV SHOW NAME & PRESS ENTER...">
+          <button type="submit" class="nl-menu-item" style="text-align:center;">[ ENTER SEARCH ]</button>
+        </form>
+        <div id="nl-search-results"></div>
+        <button class="nl-menu-item" id="nl-back-btn" style="margin-top:15px;">RETURN MAIN MENU</button>
+      `;
+
+      const form = document.getElementById('nl-search-form');
+      const input = document.getElementById('nl-search-input');
+      const resultsDiv = document.getElementById('nl-search-results');
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const query = input.value.trim();
+        if (!query) return;
+
+        resultsDiv.innerHTML = `<div style="padding:10px; color:#11aa11;">[ FETCHING DATA FROM TVMAZE... ]</div>`;
+        
+        try {
+          const res = await fetch(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(query)}`);
+          if (res.status === 429) {
+            resultsDiv.innerHTML = `<div style="color:var(--red);">[ ERROR 429: TOO MANY REQUESTS. RATE LIMITED. PLEASE WAIT. ]</div>`;
+            return;
+          }
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          
+          const data = await res.json();
+          renderSearchResults(data, resultsDiv);
+        } catch (err) {
+          resultsDiv.innerHTML = `<div style="color:var(--red);">[ NETWORK ERROR: UNABLE TO CONNECT TO TVMAZE DATABASE ]</div>`;
+        }
+      });
+
+      document.getElementById('nl-back-btn').addEventListener('click', () => { playKeyClickSound(); nlGoBack(); });
+      input.focus();
+      nlAttachKeyboardNav();
+    }
+
+    function renderSearchResults(data, container) {
+      if (!data || data.length === 0) {
+        container.innerHTML = `<div style="padding:10px;">[ NO RECORDS FOUND MATCHING QUERY ]</div>`;
+        return;
+      }
+
+      let html = `<div style="margin-bottom:10px; font-size:9px;">SEARCH RESULTS (${data.length}):</div><div class="menu" id="nl-results-menu">`;
+      data.forEach((item, index) => {
+        const s = item.show;
+        const name = s.name || 'UNKNOWN';
+        const premiered = s.premiered ? s.premiered.substring(0, 4) : 'N/A';
+        const genres = s.genres && s.genres.length ? s.genres.join(', ') : 'N/A';
+        const status = s.status || 'N/A';
+        const channel = s.network ? s.network.name : (s.webChannel ? s.webChannel.name : 'N/A');
+
+        html += `
+          <div class="nl-card nl-menu-item" data-showid="${s.id}" tabindex="0" style="cursor:pointer;">
+            ${s.image && s.image.medium ? `<img class="nl-card-img" src="${s.image.medium}" alt="poster">` : `<div class="nl-card-img" style="display:grid;place-items:center;font-size:7px;text-align:center;">NO IMAGE</div>`}
+            <div class="nl-card-info">
+              <div class="nl-card-title">${name} (${premiered})</div>
+              <div>GENRES: ${genres}</div>
+              <div>STATUS: ${status}</div>
+              <div>NETWORK: ${channel}</div>
+            </div>
+          </div>
+        `;
+      });
+      html += `</div>`;
+      container.innerHTML = html;
+
+      container.querySelectorAll('.nl-card').forEach(card => {
+        const fetchDetails = () => {
+          playKeyClickSound();
+          const showId = card.dataset.showid;
+          fetchShowDetails(showId);
+        };
+        card.addEventListener('click', fetchDetails);
+        card.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') fetchDetails();
+        });
+      });
+
+      nlAttachKeyboardNav();
+    }
+
+    async function fetchShowDetails(showId) {
+      nlAttr.classList.remove('hidden');
+      nlBody.innerHTML = `<div style="padding:20px; color:#11aa11;">[ ACCESSING SHOW RECORD #${showId}... ]</div>`;
+
+      if (showCache.has(showId)) {
+        renderShowDetails(showCache.get(showId));
+        return;
+      }
+
+      try {
+        const res = await fetch(`https://api.tvmaze.com/shows/${showId}?embed=episodes`);
+        if (res.status === 429) {
+          nlBody.innerHTML = `<div style="color:var(--red); padding:20px;">[ ERROR 429: TVMAZE RATE LIMIT EXCEEDED. TRY AGAIN MOMENTARILY. ]</div><button class="nl-menu-item" id="nl-back-btn">RETURN</button>`;
+          document.getElementById('nl-back-btn').addEventListener('click', nlGoBack);
+          return;
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+        showCache.set(showId, data);
+        renderShowDetails(data);
+      } catch (err) {
+        nlBody.innerHTML = `<div style="color:var(--red); padding:20px;">[ ERROR LOADING SHOW DETAILS ]</div><button class="nl-menu-item" id="nl-back-btn">RETURN</button>`;
+        document.getElementById('nl-back-btn').addEventListener('click', nlGoBack);
+      }
+    }
+
+    function renderShowDetails(show) {
+      nlAttr.classList.remove('hidden');
+      const episodes = show._embedded && show._embedded.episodes ? show._embedded.episodes : [];
+      const summaryClean = sanitizeHTML(show.summary) || 'NO SUMMARY AVAILABLE.';
+      const channel = show.network ? show.network.name : (show.webChannel ? show.webChannel.name : 'N/A');
+
+      let epListHtml = '';
+      episodes.forEach(ep => {
+        epListHtml += `<div class="nl-ep-item">S${ep.season}E${ep.number}: ${ep.name} (${ep.airdate || 'N/A'})</div>`;
+      });
+
+      nlBody.innerHTML = `
+        <div style="margin-bottom:10px;">NORTHLINE TV DATABASE // SHOW RECORD</div>
+        <div class="nl-card" style="flex-direction:column;">
+          <div style="display:flex; gap:16px;">
+            ${show.image && show.image.medium ? `<img class="nl-card-img" src="${show.image.medium}" alt="poster">` : `<div class="nl-card-img" style="display:grid;place-items:center;font-size:7px;">NO IMAGE</div>`}
+            <div class="nl-card-info">
+              <div class="nl-card-title">${show.name}</div>
+              <div>PREMIERED: ${show.premiered || 'N/A'}</div>
+              <div>GENRES: ${show.genres ? show.genres.join(', ') : 'N/A'}</div>
+              <div>STATUS: ${show.status || 'N/A'}</div>
+              <div>RUNTIME: ${show.runtime ? show.runtime + ' MINS' : 'N/A'}</div>
+              <div>NETWORK: ${channel}</div>
+              ${show.officialSite ? `<div>SITE: <a href="${show.officialSite}" target="_blank" class="nl-link">OFFICIAL LINK</a></div>` : ''}
+            </div>
+          </div>
+          <div style="font-size:8px; line-height:1.6; margin-top:12px; border-top:1px solid #33ff33; padding-top:8px;">
+            ${summaryClean}
+          </div>
+          <div style="margin-top:12px; font-size:9px;">EPISODE INDEX (TOTAL: ${episodes.length}):</div>
+          <div class="nl-ep-list">
+            ${epListHtml || '<div>NO EPISODE DATA</div>'}
+          </div>
+        </div>
+        <button class="nl-menu-item" id="nl-back-btn">RETURN TO SEARCH RESULTS</button>
+      `;
+
+      document.getElementById('nl-back-btn').addEventListener('click', () => { playKeyClickSound(); nlGoBack(); });
+      nlAttachKeyboardNav();
+    }
+
+    function nlAttachKeyboardNav() {
+      const items = Array.from(nlBody.querySelectorAll('.nl-menu-item, input'));
+      let focusIdx = 0;
+
+      if (items.length > 0) {
+        items[0].focus();
+        if (items[0].classList.contains('nl-menu-item')) items[0].classList.add('active');
+      }
+
+      items.forEach((item, index) => {
+        item.addEventListener('mouseenter', () => {
+          items.forEach(i => i.classList.remove('active'));
+          item.classList.add('active');
+          focusIdx = index;
+        });
+      });
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (northlineScreen.classList.contains('hidden')) return;
+
+      if (e.key === 'Escape') {
+        nlGoBack();
+        return;
+      }
+
+      const items = Array.from(nlBody.querySelectorAll('.nl-menu-item, input.nl-input'));
+      if (items.length === 0) return;
+
+      let currentActiveIndex = items.findIndex(i => i === document.activeElement || i.classList.contains('active'));
+      if (currentActiveIndex === -1) currentActiveIndex = 0;
+
+      if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        items[currentActiveIndex].classList.remove('active');
+        const next = (currentActiveIndex + 1) % items.length;
+        items[next].focus();
+        items[next].classList.add('active');
+        playKeyClickSound();
+      } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+        e.preventDefault();
+        items[currentActiveIndex].classList.remove('active');
+        const prev = (currentActiveIndex - 1 + items.length) % items.length;
+        items[prev].focus();
+        items[prev].classList.add('active');
+        playKeyClickSound();
+      }
+    });
+
+    function startStory() {
+      fadeOutTrack();
+      endPreGameAmbience();
+      pass.classList.add('hidden');
+      awakeningScreen.classList.remove('hidden');
+      updatePersistentClock("11:47 PM");
+      persistentClock.classList.remove('hidden');
+      openingSequence();
+    }
+
+    function openingSequence() {
+      gameState.currentStep = "INTRO";
+
+      const introSequence = [
+        { text: "...Huh?", action: () => {} },
+        { 
+          text: "Where am I?", 
+          action: () => {
+            // Fade in character sprite on "Where am I?"
+            awakeningSprite.classList.add('visible');
+          } 
+        },
+        { text: "You open your eyes into complete darkness.", action: () => {} },
+        { text: "The carriage is quiet except for a rhythmic click.\n\nClick. Click. Click.", action: () => {} },
+        { text: "You don't remember falling asleep.", action: () => {} },
+        { text: "You don't remember getting on the train.", action: () => {} },
+        { text: "There are five other passengers sitting around you. None of them look familiar.", action: () => {} },
+        { text: "You reach for your phone.\n\nNO SIGNAL.", action: () => {} },
+        { 
+          text: "Then you look up at the clock...", 
+          action: () => {
+            // Crossfade: Character sprite fades out, 11:47 PM fades in
+            awakeningSprite.classList.remove('visible');
+            timeReveal.textContent = gameState.storyTime;
+            timeReveal.classList.add('visible');
+          } 
+        },
+        { 
+          text: "The wall clock displays 11:47 PM.\n\nIt isn't ticking.", 
+          action: () => {} 
+        }
+      ];
+
+      let idx = 0;
+      function nextIntro() {
+        if (idx < introSequence.length) {
+          const currentBeat = introSequence[idx];
+          if (currentBeat.action) currentBeat.action();
+          showDialogue(null, currentBeat.text, () => { idx++; });
+        } else {
+          // Fade out 11:47 PM time reveal before opening hub
+          timeReveal.classList.remove('visible');
+          setTimeout(() => {
+            openCharacterHub();
+          }, 800);
+        }
+      }
+
+      window.advanceIntro = nextIntro;
+      nextIntro();
+    }
+
+    // MAIN HUB (PRE-TRIAL)
+    function openCharacterHub() {
+      gameState.currentStep = "HUB";
+
+      // Trigger 5.png to fade in when passenger selection menu appears
+      showPassengerSelectionBackground();
+
+      const options = [
+        { label: "1. Karube (Standing near the door)", action: () => talkToKarube() },
+        { label: "2. Chōta (Staring nervously out the window)", action: () => talkToChota() },
+        { label: "3. Mira (Examining the emergency panel)", action: () => talkToMira() },
+        { label: "4. Ann (Focused on the frozen clock)", action: () => talkToAnn() },
+        { label: "5. Niragi (Leaning back, strangely calm)", action: () => talkToNiragi() }
+      ];
+
+      showChoices(null, "WHO DO YOU WANT TO TALK TO?", options);
+    }
+
+    // HELPER: COUNT COMPLETED DISTINCT PASSENGERS
+    function finishPassengerConversation(passengerKey) {
+      // Fade out 5.png when passenger selection closes & dialogue transitions
+      hidePassengerSelectionBackground();
+
+      gameState.spokenTo[passengerKey] = true;
+      const distinctCount = Object.values(gameState.spokenTo).filter(Boolean).length;
+      
+      if (distinctCount >= 3) {
+        startTrialTransition();
+      } else {
+        openCharacterHub();
+      }
+    }
+
+    // 1. KARUBE
+    function talkToKarube() {
+      let startText = '"You were asleep too?"';
+      if (gameState.choices.karube_doors) {
+        startText = '"Back again? Still working on these doors."';
+      }
+
+      showChoices('karube', startText, [
+        { 
+          label: '1. "Yeah. Where are we?"', 
+          action: () => {
+            gameState.trust.karube += 1;
+            showDialogue('karube', '"I don\'t know.\n\nI woke up here maybe ten minutes before you."', () => {
+              showChoices('karube', '"What do you remember before that?"', [
+                {
+                  label: '1. "Do you trust the others?"',
+                  action: () => showDialogue('karube', '"Not yet. Especially that Niragi guy. He\'s too quiet."', () => finishPassengerConversation('karube'))
+                },
+                {
+                  label: '2. "Let\'s talk later."',
+                  action: () => finishPassengerConversation('karube')
+                }
+              ]);
+            });
+          }
+        },
+        { 
+          label: '2. "Have you tried opening the doors?"', 
+          action: () => {
+            gameState.choices.karube_doors = true;
+            gameState.clues.doorsLockedFromInside = true;
+            showDialogue('karube', '"The doors are locked.\n\nNot stuck. Locked from the heavy deadbolt side."', () => {
+              showChoices('karube', '"What should we do?"', [
+                {
+                  label: '1. "Did you try the emergency release?"',
+                  action: () => showDialogue('karube', '"Dead. Wiring has no power going to it."', () => finishPassengerConversation('karube'))
+                },
+                {
+                  label: '2. "Maybe we shouldn\'t force them."',
+                  action: () => showDialogue('karube', '"And stay trapped? Not a chance."', () => finishPassengerConversation('karube'))
+                }
+              ]);
+            });
+          }
+        },
+        { 
+          label: '3. "Who are the other passengers?"', 
+          action: () => {
+            showDialogue('karube', '"Five others.\n\nNobody seems to know each other. Or at least, they\'re pretending not to."', () => {
+              showChoices('karube', '"Who seems the most suspicious?"', [
+                {
+                  label: '1. "Who do you think?"',
+                  action: () => showDialogue('karube', '"The woman by the clock — Ann. She hasn\'t blinked once."', () => finishPassengerConversation('karube'))
+                },
+                {
+                  label: '2. "Never mind."',
+                  action: () => finishPassengerConversation('karube')
+                }
+              ]);
+            });
+          }
+        },
+        { label: '4. "Never mind."', action: () => openCharacterHub() }
+      ]);
+    }
+
+    // 2. CHŌTA
+    function talkToChota() {
+      let intro = '"The glass... it\'s too dark outside. I can\'t see tracks."';
+      if (gameState.spokenTo.karube) {
+        intro = '"Did... did Karube tell you anything? He was already awake and pacing when I opened my eyes."';
+        gameState.clues.karubeAwakeFirst = true;
+      }
+
+      showChoices('chota', intro, [
+        {
+          label: '1. "Are you okay? Your hands are shaking."',
+          action: () => {
+            gameState.trust.chota += 1;
+            showDialogue('chota', '"I\'m fine! I just... I don\'t remember buying a ticket. Do you?"', () => {
+              showChoices('chota', '"What do you remember?"', [
+                {
+                  label: '1. "I remember standing on the platform."',
+                  action: () => showDialogue('chota', '"The platform... right. Rain? Was it raining?"', () => finishPassengerConversation('chota'))
+                },
+                {
+                  label: '2. "Nothing. My mind is blank."',
+                  action: () => showDialogue('chota', '"Me too... it\'s like someone wiped the last two hours."', () => finishPassengerConversation('chota'))
+                }
+              ]);
+            });
+          }
+        },
+        {
+          label: '2. "Karube said he woke up after everyone else."',
+          action: () => {
+            gameState.suspicion.karube += 1;
+            showDialogue('chota', '"He... he said that? But I swear I saw him standing over the control panel while everyone was still out!"', () => finishPassengerConversation('chota'));
+          }
+        },
+        { label: '3. "I\'ll leave you alone."', action: () => openCharacterHub() }
+      ]);
+    }
+
+    // 3. MIRA
+    function talkToMira() {
+      showChoices('mira', '"Don\'t touch the switches. The breaker panel has been manually tampered with."', [
+        {
+          label: '1. "You know about electronics?"',
+          action: () => {
+            showDialogue('mira', '"I know when a seal has been broken fresh. Look at the copper scrapings on the floor."', () => {
+              showChoices('mira', '"What does that mean?"', [
+                {
+                  label: '1. "Someone locked us in on purpose."',
+                  action: () => {
+                    gameState.trust.mira += 1;
+                    showDialogue('mira', '"Precisely. Which means the culprit is likely inside this car with us."', () => finishPassengerConversation('mira'));
+                  }
+                },
+                {
+                  label: '2. "It might just be a mechanical breakdown."',
+                  action: () => showDialogue('mira', '"Naïve. Look closer next time."', () => finishPassengerConversation('mira'))
+                }
+              ]);
+            });
+          }
+        },
+        {
+          label: '2. "Have you noticed anything strange about the others?"',
+          action: () => showDialogue('mira', '"Chōta is hiding something in his coat pocket. And Niragi keeps watching the ceiling speaker."', () => finishPassengerConversation('mira'))
+        },
+        { label: '3. "Step away."', action: () => openCharacterHub() }
+      ]);
+    }
+
+    // 4. ANN
+    function talkToAnn() {
+      showChoices('ann', '"11:47 PM. It was 11:47 PM when I looked at my watch before boarding. It\'s still 11:47 PM."', [
+        {
+          label: '1. "Batteries might be dead."',
+          action: () => {
+            showDialogue('ann', '"All our phones stopped at 11:47 as well. That isn\'t a battery failure."', () => {
+              showChoices('ann', '"What are you getting at?"', [
+                {
+                  label: '1. "Time has stopped?"',
+                  action: () => {
+                    gameState.clues.clockFrozenAt1147 = true;
+                    showDialogue('ann', '"Or we are moving faster than time. Or... we aren\'t anywhere real."', () => finishPassengerConversation('ann'));
+                  }
+                },
+                {
+                  label: '2. "This is ridiculous."',
+                  action: () => showDialogue('ann', '"Denial is a comfortable reaction."', () => finishPassengerConversation('ann'))
+                }
+              ]);
+            });
+          }
+        },
+        {
+          label: '2. "Do you have your ticket?"',
+          action: () => showDialogue('ann', '"My ticket? In my pocket. Why? Did you lose yours?"', () => finishPassengerConversation('ann'))
+        },
+        { label: '3. "Never mind."', action: () => openCharacterHub() }
+      ]);
+    }
+
+    // 5. NIRAGI
+    function talkToNiragi() {
+      let prompt = '"Enjoying the tour around the carriage?"';
+      if (gameState.clues.karubeAwakeFirst) prompt = '"You look like you\'ve heard a few conflicting stories, friend."';
+
+      showChoices('niragi', prompt, [
+        {
+          label: '1. "You seem surprisingly relaxed."',
+          action: () => {
+            gameState.clues.niragiCalmness = true;
+            showDialogue('niragi', '"Panic burns calories. Why bother when the show hasn\'t even started?"', () => {
+              showChoices('niragi', '"What show?"', [
+                {
+                  label: '1. "What do you know?"',
+                  action: () => showDialogue('niragi', '"I know someone in this room doesn\'t belong. Maybe it\'s me. Maybe it\'s you."', () => finishPassengerConversation('niragi'))
+                },
+                {
+                  label: '2. "You\'re insane."',
+                  action: () => showDialogue('niragi', '"Maybe. But at least I\'m not blind."', () => finishPassengerConversation('niragi'))
+                }
+              ]);
+            });
+          }
+        },
+        {
+          label: '2. "Karube thinks you\'re suspicious."',
+          action: () => {
+            gameState.suspicion.niragi += 1;
+            showDialogue('niragi', '"Karube thinks with his fists. Ask him where his train ticket is and watch his face."', () => finishPassengerConversation('niragi'));
+          }
+        },
+        { label: '3. "Back off."', action: () => openCharacterHub() }
+      ]);
+    }
+
+    // ==================================================
+    // TRANSITION TO TRIAL 01
+    // ==================================================
+    function startTrialTransition() {
+      gameState.currentStep = "TRIAL_INTRO";
+      dialogueWrapper.classList.remove('show');
+      
+      setTimeout(() => {
+        const sequence = [
+          { text: "BLACK SCREEN.", speaker: null },
+          { text: "A sound.\n\nClick.\nClick.\nClick.", speaker: null },
+          { text: "\"ATTENTION, PASSENGERS.\"", speaker: null },
+          { text: "\"YOUR JOURNEY WILL NOW BEGIN.\"", speaker: null },
+          { text: "\"TRIAL 01 WILL COMMENCE SHORTLY.\"", speaker: null },
+          { text: "TRIAL 01\n\nTHE MISSING TICKET", speaker: null },
+          { text: "\"Five passengers.\n\nFive tickets.\n\nOne of them is wrong.\"", speaker: null },
+          { text: "\"The rules are simple.\n\nFind the passenger carrying the wrong ticket.\"", speaker: null },
+          { text: "\"Choose incorrectly...\n\n...and the trial ends.\"", speaker: null }
+        ];
+
+        let sIdx = 0;
+        function runSeq() {
+          if (sIdx < sequence.length) {
+            showDialogue(sequence[sIdx].speaker, sequence[sIdx].text, () => {
+              sIdx++;
+            });
+          } else {
+            openTrialHub();
+          }
+        }
+
+        window.advanceIntro = runSeq;
+        runSeq();
+      }, 500);
+    }
+
+    // ==================================================
+    // TRIAL 01 MAIN HUB
+    // ==================================================
+    function openTrialHub() {
+      gameState.currentStep = "TRIAL_HUB";
+
+      const options = [
+        { label: "1. INSPECT TICKETS", action: () => inspectTickets() },
+        { label: "2. TALK TO PASSENGERS", action: () => trialTalkHub() },
+        { label: "3. MAKE AN ACCUSATION", action: () => makeAccusationHub() }
+      ];
+
+      showChoices(null, "TRIAL 01 — THE MISSING TICKET\nSelect an action:", options);
+    }
+
+    // 1. INSPECT TICKETS
+    function inspectTickets() {
+      let text = "PASSENGER TICKETS RECOVERED:\n\n";
+      TICKETS_DATA.forEach(t => {
+        text += `[${t.name}]\nCAR: ${t.car} | SEAT: ${t.seat} | BOARDING: ${t.time}\n-----------------------------\n`;
+      });
+      text += `(Current Clock Display: ${gameState.storyTime})`;
+
+      showDialogue(null, text, () => {
+        openTrialHub();
+      });
+    }
+
+    // 2. TALK TO PASSENGERS (TRIAL)
+    function trialTalkHub() {
+      const options = [
+        { label: "1. Karube", action: () => trialTalkKarube() },
+        { label: "2. Chōta", action: () => trialTalkChota() },
+        { label: "3. Mira", action: () => trialTalkMira() },
+        { label: "4. Ann", action: () => trialTalkAnn() },
+        { label: "5. Niragi", action: () => trialTalkNiragi() },
+        { label: "6. [Back to Trial Menu]", action: () => openTrialHub() }
+      ];
+
+      showChoices(null, "TALK TO PASSENGERS (TRIAL)", options);
+    }
+
+    function trialTalkKarube() {
+      showChoices('karube', '"I checked my ticket before I woke up."', [
+        {
+          label: '1. "Before you woke up?"',
+          action: () => showDialogue('karube', '"Yeah. In my dream, or whatever it was. It was sitting in my hand."', () => openTrialHub())
+        },
+        {
+          label: '2. "What time does it say?"',
+          action: () => showDialogue('karube', '"It says 11:31 PM. I remember seeing that clearly."', () => openTrialHub())
+        },
+        { label: '3. "Never mind."', action: () => openTrialHub() }
+      ]);
+    }
+
+    function trialTalkChota() {
+      let prompt = '"I don\'t remember boarding..."';
+      if (gameState.trust.chota > 0) prompt += ' "Thanks for believing me earlier, by the way."';
+
+      showChoices('chota', prompt, [
+        {
+          label: '1. "What time is on your ticket?"',
+          action: () => showDialogue('chota', '"11:34 PM... I think.\n\nWhy? Is something wrong with it?"', () => openTrialHub())
+        },
+        { label: '2. "Hang in there."', action: () => openTrialHub() }
+      ]);
+    }
+
+    function trialTalkMira() {
+      let prompt = '"The boarding times are interesting."';
+      if (gameState.trust.mira > 0) prompt = '"I knew you were observant. Notice anything about the timestamps?"';
+
+      showChoices('mira', prompt, [
+        {
+          label: '1. "What do you mean?"',
+          action: () => {
+            showDialogue('mira', '"Everyone\'s ticket places their boarding before 11:47.\n\n...Except one."', () => openTrialHub());
+          }
+        },
+        {
+          label: '2. "You think one is wrong?"',
+          action: () => showDialogue('mira', '"I don\'t think. I observe. Look at the clock, then look at the cards."', () => openTrialHub())
+        },
+        { label: '3. "Never mind."', action: () => openTrialHub() }
+      ]);
+    }
+
+    function trialTalkAnn() {
+      showDialogue('ann', '"Mine says 11:42 PM.\n\nThat was five minutes before the clock stopped."', () => openTrialHub());
+    }
+
+    function trialTalkNiragi() {
+      showChoices('niragi', '"Mine? What about it?"', [
+        {
+          label: '1. "Your ticket says 11:52 PM."',
+          action: () => {
+            showDialogue('niragi', '"11:52 PM."\n\nNiragi smiles.\n\n"Is that a problem? It hasn\'t happened yet."', () => openTrialHub());
+          }
+        },
+        { label: '2. "Never mind."', action: () => openTrialHub() }
+      ]);
+    }
+
+    // 3. MAKE AN ACCUSATION
+    function makeAccusationHub() {
+      const options = [
+        { label: "1. Karube", action: () => confirmAccusation('karube') },
+        { label: "2. Chōta", action: () => confirmAccusation('chota') },
+        { label: "3. Mira", action: () => confirmAccusation('mira') },
+        { label: "4. Ann", action: () => confirmAccusation('ann') },
+        { label: "5. Niragi", action: () => confirmAccusation('niragi') },
+        { label: "6. [Back to Trial Menu]", action: () => openTrialHub() }
+      ];
+
+      showChoices(null, "WHO IS CARRYING THE WRONG TICKET?", options);
+    }
+
+    function confirmAccusation(passengerKey) {
+      const name = PASSENGERS[passengerKey].name;
+      showChoices(null, `Accuse ${name}?\nAre you sure?`, [
+        { label: '1. Yes.', action: () => processAccusation(passengerKey) },
+        { label: '2. No.', action: () => makeAccusationHub() }
+      ]);
+    }
+
+    function processAccusation(passengerKey) {
+      if (passengerKey !== 'niragi') {
+        // WRONG ANSWER
+        mainScreen.classList.add('glitch-flash');
+        setTimeout(() => mainScreen.classList.remove('glitch-flash'), 600);
+
+        showDialogue(null, "INCORRECT.\n\nThe train goes silent.\n\nTRIAL FAILED.", () => {
+          showChoices(null, "TRIAL 01 FAILED", [
+            { label: '1. RETRY TRIAL', action: () => openTrialHub() }
+          ]);
+        });
+      } else {
+        // CORRECT ANSWER (NIRAGI)
+        executeCorrectEnding();
+      }
+    }
+
+    function executeCorrectEnding() {
+      gameState.currentStep = "TRIAL_01_ENDING";
+      const seq = [
+        { text: "CORRECT.\n\nPASSENGER IDENTIFIED.", speaker: null },
+        { text: "\"...You noticed.\n\nBut that isn't my ticket.\"", speaker: "niragi" },
+        { 
+          text: `[TICKET RECOVERED]\n\nNAME: ${gameState.playerName}\nCAR: 07 | SEAT: 14\nBOARDING TIME: [CORRUPTED]`, 
+          speaker: null 
+        },
+        { text: "\"Looks like someone else is missing a ticket too.\"", speaker: "niragi" },
+        { text: "TRIAL COMPLETE.", speaker: null }
+      ];
+
+      let idx = 0;
+      function runEnding() {
+        if (idx === seq.length - 1) {
+          mainScreen.classList.add('glitch-flash');
+          setTimeout(() => mainScreen.classList.remove('glitch-flash'), 400);
+        }
+        if (idx < seq.length) {
+          showDialogue(seq[idx].speaker, seq[idx].text, () => { idx++; });
+        } else {
+          window.advanceIntro = null;
+          startTrial02Transition();
+        }
+      }
+
+      window.advanceIntro = runEnding;
+      runEnding();
+    }
+
+    // ==================================================
+    // TRIAL 02 — THE PASSENGER COUNT
+    // ==================================================
+    function startTrial02Transition() {
+      window.advanceIntro = null;
+      resetTrial02State();
+      gameState.currentStep = "TRIAL_02_INTRO";
+      dialogueWrapper.classList.remove('show');
+      setTimeout(runTrial02Intro, 500);
+    }
+
+    function runTrial02Intro() {
+      const sequence = [
+        { text: "BLACK SCREEN.", speaker: null },
+        { text: "Click.\nClick.\nClick.", speaker: null },
+        { text: "\"ATTENTION, PASSENGERS.\"", speaker: null },
+        { text: "\"TRIAL 02 WILL NOW COMMENCE.\"", speaker: null },
+        { text: "TRIAL 02\n\nTHE PASSENGER COUNT", speaker: null },
+        { text: "\"CURRENT PASSENGER COUNT: 6.\"", speaker: null },
+        { text: "\"THE COUNT IS CORRECT.\"", speaker: null },
+        { text: "The five passengers look at each other.", speaker: null },
+        { text: "You count them.", speaker: null },
+        { text: "Karube.", speaker: null },
+        { text: "Chōta.", speaker: null },
+        { text: "Mira.", speaker: null },
+        { text: "Ann.", speaker: null },
+        { text: "Niragi.", speaker: null },
+        { text: "And you.", speaker: null },
+        { text: "Six.", speaker: null },
+        { text: "\"PASSENGER COUNT VERIFIED.\"", speaker: null },
+        { text: "\"ONE PASSENGER MUST EXIT.\"", speaker: null },
+        { text: "Pause.", speaker: null },
+        { text: "\"CHOOSE.\"", speaker: null }
+      ];
+
+      let idx = 0;
+      function advance() {
+        if (idx < sequence.length) {
+          showDialogue(sequence[idx].speaker, sequence[idx].text, () => { idx++; });
+        } else {
+          gameState.trial02.introComplete = true;
+          gameState.currentStep = "TRIAL_02_HUB";
+          openTrial02Hub();
+        }
+      }
+      window.advanceIntro = advance;
+      advance();
+    }
+
+    function openTrial02Hub() {
+      gameState.currentStep = "TRIAL_02_HUB";
+      const options = [
+        { label: "1. COUNT THE PASSENGERS", action: () => trial02CountPassengers() },
+        { label: "2. INSPECT THE SEATS", action: () => trial02InspectSeats() },
+        { label: "3. TALK TO PASSENGERS", action: () => trial02TalkHub() },
+        { label: "4. CHECK THE TRAIN DISPLAY", action: () => trial02CheckDisplay() },
+        { label: "5. MAKE A CHOICE", action: () => trial02MakeChoiceEntry() }
+      ];
+      showChoices(null, "TRIAL 02 — THE PASSENGER COUNT\nSelect an action:", options);
+    }
+
+    function trial02CountPassengers() {
+      gameState.trial02.countedPassengers = true;
+      const text = buildTrial02CountText() + "\n\nThe count is correct.";
+      showDialogue(null, text, () => trial02FinishInvestigation());
+    }
+
+    function trial02InspectSeats() {
+      gameState.trial02.inspectedSeats = true;
+      showDialogue(null, buildTrial02SeatsText(), () => trial02FinishInvestigation());
+    }
+
+    function trial02CheckDisplay() {
+      showDialogue(null, "TRAIN DISPLAY:\n\nCURRENT PASSENGER COUNT: 6", () => trial02FinishInvestigation());
+    }
+
+    function trial02MakeChoiceEntry() {
+      if (gameState.trial02.finalPhase) openTrial02FinalChoice();
+      else showDialogue(null, "ONE PASSENGER MUST EXIT.\n\nBut something feels wrong.\nYou should investigate more.", () => openTrial02Hub());
+    }
+
+    function trial02TalkHub() {
+      const visible = getVisibleTrial02Npcs();
+      if (visible.length === 0) {
+        showDialogue(null, "There is no one left to talk to.", () => openTrial02Hub());
+        return;
+      }
+      const options = visible.map((key, i) => ({
+        label: `${i + 1}. ${PASSENGERS[key].name}`,
+        action: () => trial02TalkPassenger(key)
+      }));
+      options.push({ label: `${options.length + 1}. [Back to Trial Menu]`, action: () => openTrial02Hub() });
+      showChoices(null, "TALK TO PASSENGERS (TRIAL 02)", options);
+    }
+
+    function trial02TalkPassenger(key) {
+      markTrial02Talk(key);
+      const gone = gameState.trial02.disappeared.length;
+      if (key === 'karube') {
+        showDialogue('karube', '"I counted six."\n"Us five, plus you."\n"So what\'s the problem?"', () => trial02FinishInvestigation());
+      } else if (key === 'chota') {
+        let text = '"The machine says six."\n"I don\'t understand why we\'re being asked to choose."';
+        if (gone > 0) text += '\n\n"Where did Karube go?"';
+        showDialogue('chota', text, () => trial02FinishInvestigation());
+      } else if (key === 'mira') {
+        let text = '"The count itself isn\'t wrong."\n"That\'s what bothers me."';
+        if (gone >= 2) text += '\n\n"People keep vanishing. The display never changes."';
+        showDialogue('mira', text, () => trial02FinishInvestigation());
+      } else if (key === 'ann') {
+        showDialogue('ann', '"The train isn\'t asking us to count."\n"It\'s asking us to decide who belongs."', () => trial02FinishInvestigation());
+      } else if (key === 'niragi') {
+        showChoices('niragi', '"You\'ve noticed it too, haven\'t you?"\n"The number isn\'t the strange part."', [
+          { label: '1. "What do you mean?"', action: () => showDialogue('niragi', '"Six is perfectly correct."\n"Until someone disappears."', () => trial02FinishInvestigation()) },
+          { label: '2. "Never mind."', action: () => trial02FinishInvestigation() }
+        ]);
+      }
+    }
+
+    function runTrial02Disappearance(npcKey) {
+      gameState.currentStep = "TRIAL_02_CINEMATIC";
+      const name = PASSENGERS[npcKey].name;
+      const isFirst = gameState.trial02.disappeared.length === 0;
+      mainScreen.classList.add('glitch-flash');
+      setTimeout(() => mainScreen.classList.remove('glitch-flash'), 600);
+
+      const announceCount = 5 - gameState.trial02.disappeared.length;
+      const sequence = [
+        { text: "The lights flicker.", speaker: null },
+        { text: "BLACK SCREEN.", speaker: null },
+        { text: "PASSENGER COUNT UPDATED.", speaker: null },
+        { text: `CURRENT PASSENGER COUNT: ${announceCount}.`, speaker: null },
+        { text: `When the lights return, ${name} is gone.`, speaker: null }
+      ];
+      if (isFirst && npcKey === 'karube') {
+        sequence.push({ text: "You remember Karube.\nThe seat remains.\nBut he isn't there.", speaker: null });
+        sequence.push({ text: "The other passengers look uneasy.\nThe train behaves as if nothing happened.", speaker: null });
+      } else {
+        sequence.push({ text: `You remember ${name}.\nThe empty seat remains.`, speaker: null });
+        if (gameState.trial02.disappeared.length >= 2) {
+          sequence.push({ text: "The remaining passengers grow more frightened.", speaker: null });
+        }
+      }
+
+      let idx = 0;
+      function advance() {
+        if (idx < sequence.length) {
+          showDialogue(sequence[idx].speaker, sequence[idx].text, () => { idx++; });
+        } else {
+          gameState.trial02.disappeared.push(npcKey);
+          gameState.trial02.actionsSinceDisappearance = 0;
+          if (gameState.trial02.disappeared.length >= TRIAL02_DISAPPEAR_ORDER.length) gameState.trial02.finalPhase = true;
+          gameState.currentStep = "TRIAL_02_HUB";
+          openTrial02Hub();
+        }
+      }
+      window.advanceIntro = advance;
+      advance();
+    }
+
+    function openTrial02FinalChoice() {
+      gameState.currentStep = "TRIAL_02_FINAL";
+      showDialogue(null, "\"ATTENTION, PASSENGER.\"\n\n\"ONE PASSENGER DOES NOT BELONG.\"\n\n\"SELECT THE PASSENGER WHO MUST EXIT.\"", () => {
+        const options = [
+          { label: "1. KARUBE", action: () => processTrial02ExitChoice('karube') },
+          { label: "2. CHŌTA", action: () => processTrial02ExitChoice('chota') },
+          { label: "3. MIRA", action: () => processTrial02ExitChoice('mira') },
+          { label: "4. ANN", action: () => processTrial02ExitChoice('ann') },
+          { label: "5. NIRAGI", action: () => processTrial02ExitChoice('niragi') },
+          { label: "6. MYSELF", action: () => processTrial02ExitChoice('myself') }
+        ];
+        showChoices(null, "WHO SHOULD EXIT THE TRAIN?", options);
+      });
+    }
+
+    function processTrial02ExitChoice(choice) {
+      if (choice === 'myself') runTrial02SuccessEnding();
+      else runTrial02WrongEnding(choice);
+    }
+
+    function runTrial02WrongEnding(passengerKey) {
+      gameState.currentStep = "TRIAL_02_WRONG";
+      const name = PASSENGERS[passengerKey].name;
+      const sequence = [
+        { text: "The train becomes completely silent.", speaker: null },
+        { text: `${name} appears in the carriage.`, speaker: null },
+        { text: "The doors open.", speaker: null },
+        { text: `${name} is standing beside them.`, speaker: null },
+        { text: "\"CHOICE ACCEPTED.\"", speaker: null },
+        { text: "Pause.", speaker: null },
+        { text: "\"PASSENGER REMOVED.\"", speaker: null },
+        { text: "CURRENT PASSENGER COUNT: 5", speaker: null },
+        { text: "\"...\"", speaker: null },
+        { text: "\"INCORRECT.\"", speaker: null },
+        { text: "The doors slam shut.", speaker: null },
+        { text: "The lights go out.", speaker: null },
+        { text: "TRIAL FAILED.", speaker: null },
+        { text: "\"THE PASSENGER WHO DOES NOT BELONG REMAINS.\"", speaker: null },
+        { text: "The train kills you.", speaker: null },
+        { text: "YOU DIED.", speaker: null },
+        { text: "GAME OVER.", speaker: null }
+      ];
+
+      let idx = 0;
+      function advance() {
+        if (idx === 10) { mainScreen.classList.add('glitch-flash'); setTimeout(() => mainScreen.classList.remove('glitch-flash'), 600); }
+        if (idx === 14) { mainScreen.classList.add('glitch-flash'); setTimeout(() => mainScreen.classList.remove('glitch-flash'), 800); }
+        if (idx < sequence.length) {
+          showDialogue(null, sequence[idx].text, () => { idx++; });
+        } else {
+          showChoices(null, "TRIAL 02 FAILED", [
+            { label: "1. RETRY TRIAL", action: () => startTrial02Transition() }
+          ]);
+        }
+      }
+      window.advanceIntro = advance;
+      advance();
+    }
+
+    function runTrial02SuccessEnding() {
+      gameState.currentStep = "TRIAL_02_SUCCESS";
+      const sequence = [
+        { text: "The train goes completely silent.", speaker: null },
+        { text: "MYSELF.", speaker: null },
+        { text: "Pause.", speaker: null },
+        { text: "\"...\"", speaker: null },
+        { text: "\"CHOICE ACCEPTED.\"", speaker: null },
+        { text: "You expect to die.", speaker: null },
+        { text: "PASSENGER COUNT UPDATED.", speaker: null },
+        { text: "CURRENT PASSENGER COUNT: 1", speaker: null },
+        { text: "The carriage is empty.", speaker: null },
+        { text: "The doors unlock.", speaker: null },
+        { 
+          text: "11:47 PM", 
+          speaker: null, 
+          action: () => { 
+            timeReveal.textContent = "11:47 PM"; 
+            timeReveal.classList.add('visible'); 
+          } 
+        },
+        { text: "...", speaker: null },
+        { 
+          text: "11:48 PM", 
+          speaker: null, 
+          action: () => { 
+            persistentClock.classList.add('glitching');
+            setTimeout(() => {
+              updatePersistentClock("11:48 PM");
+              timeReveal.textContent = "11:48 PM"; 
+              persistentClock.classList.remove('glitching');
+            }, 300);
+          } 
+        },
+        { text: "TRIAL COMPLETE.", speaker: null },
+        { text: "\"ALL PASSENGERS HAVE BEEN ACCOUNTED FOR.\"", speaker: null }
+      ];
+
+      let idx = 0;
+      function advance() {
+        if (idx < sequence.length) {
+          const beat = sequence[idx];
+          if (beat.action) beat.action();
+          showDialogue(null, beat.text, () => { idx++; });
+        } else {
+          timeReveal.classList.remove('visible');
+          setTimeout(runTrial02FinalEnding, 800);
+        }
+      }
+      window.advanceIntro = advance;
+      advance();
+    }
+
+    function runTrial02FinalEnding() {
+      gameState.currentStep = "TRIAL_02_ENDING";
+      const sequence = [
+        { text: "The train doors open.", speaker: null },
+        { text: "You step outside.", speaker: null },
+        { text: "You look back at the train.", speaker: null, action: () => showEndingFaces(false) },
+        { text: "Through the windows, all five passengers are sitting inside.", speaker: null },
+        { text: "Karube.\nChōta.\nMira.\nAnn.\nNiragi.", speaker: null },
+        { text: "They are completely still.", speaker: null },
+        { text: "They look almost like they are waiting.", speaker: null },
+        { text: "You are confused.\nYou KNOW those people disappeared.", speaker: null },
+        { text: "Their faces begin to glitch.", speaker: null, action: () => runEndingFaceGlitch() },
+        { text: "...", speaker: null },
+        { text: "\"What?\"", speaker: null },
+        { text: "BLACK SCREEN.", speaker: null, action: () => hideEndingFaces() },
+        { text: "PASSENGER COUNT: 1", speaker: null },
+        { text: "...", speaker: null },
+        { 
+          text: "11:48 PM", 
+          speaker: null, 
+          action: () => { 
+            timeReveal.textContent = "11:48 PM"; 
+            timeReveal.classList.add('visible'); 
+          } 
+        },
+        { text: "...", speaker: null },
+        { text: "\"It always was.\"", speaker: null },
+        { text: "END.", speaker: null, action: () => { timeReveal.classList.remove('visible'); continuePrompt.classList.add('hidden'); } }
+      ];
+
+      let idx = 0;
+      function advance() {
+        if (idx < sequence.length) {
+          const beat = sequence[idx];
+          if (beat.action) beat.action();
+          showDialogue(null, beat.text, () => { idx++; });
+        }
+      }
+      window.advanceIntro = advance;
+      advance();
+    }
+
+    function showEndingFaces(show) {
+      let faceContainer = document.querySelector('#ending-faces');
+      if (!faceContainer) {
+        faceContainer = document.createElement('div');
+        faceContainer.id = 'ending-faces';
+        faceContainer.className = 'ending-faces hidden';
+        awakeningScreen.appendChild(faceContainer);
+      }
+      if (!show) {
+        faceContainer.innerHTML = '';
+        TRIAL02_DISAPPEAR_ORDER.forEach(key => {
+          const img = document.createElement('img');
+          img.src = PASSENGERS[key].avatar;
+          img.alt = PASSENGERS[key].name;
+          faceContainer.appendChild(img);
+        });
+        faceContainer.classList.remove('hidden');
+        requestAnimationFrame(() => faceContainer.classList.add('show'));
+        return;
+      }
+      faceContainer.classList.add('show');
+    }
+
+    function hideEndingFaces() {
+      const faceContainer = document.querySelector('#ending-faces');
+      if (faceContainer) {
+        faceContainer.classList.remove('show');
+        faceContainer.classList.add('hidden');
+      }
+    }
+
+    function runEndingFaceGlitch() {
+      const faceContainer = document.querySelector('#ending-faces');
+      if (!faceContainer) return;
+      const imgs = faceContainer.querySelectorAll('img');
+      const playerUrl = getPlayerAvatarUrl();
+      let i = 0;
+      function glitchNext() {
+        if (i >= imgs.length) return;
+        imgs[i].classList.add('glitching');
+        setTimeout(() => {
+          imgs[i].src = playerUrl;
+          imgs[i].classList.remove('glitching');
+          i++;
+          if (i < imgs.length) setTimeout(glitchNext, 700);
+        }, 280);
+      }
+      glitchNext();
+    }
+
+    // --- GLOBAL INPUT HANDLING & NUMBER KEY CONTROL ---
+    function handleAdvance() {
+      if (isTyping) {
+        finishTyping();
+        return;
+      }
+
+      if (window.advanceIntro && CINEMATIC_STEPS.includes(gameState.currentStep)) {
+        window.advanceIntro();
+      }
+    }
+
+    awakeningScreen.addEventListener('click', () => {
+      if (choicesContainer.classList.contains('hidden')) {
+        handleAdvance();
+      }
+    });
+
+    window.addEventListener('keydown', (e) => {
+      // Space / Enter advancing text
+      if ((e.code === 'Space' || e.code === 'Enter') && !awakeningScreen.classList.contains('hidden')) {
+        if (choicesContainer.classList.contains('hidden')) {
+          handleAdvance();
+        }
+      }
+
+      // Number keys 1-6 for choosing options in main game
+      if (awakeningScreen && !awakeningScreen.classList.contains('hidden') && !choicesContainer.classList.contains('hidden') && activeChoiceOptions.length > 0) {
+        const num = parseInt(e.key, 10);
+        if (!isNaN(num) && num >= 1 && num <= activeChoiceOptions.length) {
+          const opt = activeChoiceOptions[num - 1];
+          choicesContainer.classList.add('hidden');
+          activeChoiceOptions = [];
+          opt.action();
+        }
+      }
+    });
+
+    document.querySelector('#sync').addEventListener('click', startStory);
+  </script>
+</body>
+</html>
